@@ -2,8 +2,10 @@ package http
 
 import (
 	"bufio"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -35,19 +37,24 @@ func NewClient() *Client {
 }
 
 func (c *Client) Get(url string) (*Response, error) {
-	if cachedResp, ok := c.cache.Get(url).(*Response); ok {
-		return cachedResp, nil
+	if cachedResp := c.cache.Get(url); cachedResp != nil {
+		return cachedResp.(*Response), nil
 	}
 
 	parsedURL, err := utils.ParseURL(url)
 	if err != nil {
 		return nil, err
 	}
+
 	host := parsedURL.Host
 	path := parsedURL.Path
 	if path == "" {
 		path = "/"
 	}
+	if parsedURL.Query != "" {
+		path += "?" + parsedURL.Query
+	}
+
 	port := "80"
 	if parsedURL.Scheme == "https" {
 		port = "443"
@@ -59,9 +66,21 @@ func (c *Client) Get(url string) (*Response, error) {
 	}
 
 	addr := fmt.Sprintf("%s:%s", host, port)
-	conn, err := net.DialTimeout("tcp", addr, c.Timeout)
-	if err != nil {
-		return nil, fmt.Errorf("connection error: %w", err)
+
+	var conn net.Conn
+	var err2 error
+
+	if parsedURL.Scheme == "https" {
+		tlsConfig := &tls.Config{
+			ServerName: host,
+		}
+		conn, err2 = tls.Dial("tcp", addr, tlsConfig)
+	} else {
+		conn, err2 = net.DialTimeout("tcp", addr, c.Timeout)
+	}
+
+	if err2 != nil {
+		return nil, fmt.Errorf("connection error: %w", err2)
 	}
 	defer conn.Close()
 
@@ -86,7 +105,6 @@ func (c *Client) Get(url string) (*Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
-	fmt.Println(resp)
 
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		location := resp.Headers["Location"]
@@ -127,6 +145,7 @@ func readResponse(conn net.Conn) (*Response, error) {
 		Protocol:   parts[0],
 		StatusCode: 0,
 		Headers:    map[string]string{},
+		Body:       "",
 	}
 
 	if len(parts) > 1 {
@@ -140,6 +159,9 @@ func readResponse(conn net.Conn) (*Response, error) {
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
+			if err == io.EOF {
+				return nil, errors.New("unexpected EOF while reading headers")
+			}
 			return nil, fmt.Errorf("error reading header: %w", err)
 		}
 
@@ -152,66 +174,15 @@ func readResponse(conn net.Conn) (*Response, error) {
 		if colonIdx > 0 {
 			key := strings.TrimSpace(line[:colonIdx])
 			value := strings.TrimSpace(line[colonIdx+1:])
-			resp.Headers[key] = value
+			resp.Headers[strings.ToLower(key)] = value
 		}
 	}
 
-	if chunked := resp.Headers["Transfer-Encoding"] == "chunked"; chunked {
-		var body strings.Builder
-		for {
-			sizeLine, err := reader.ReadString('\n')
-			if err != nil {
-				return nil, fmt.Errorf("error reading chunk size: %w", err)
-			}
-
-			size, err := strconv.ParseInt(strings.TrimSpace(sizeLine), 16, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid chunk size: %w", err)
-			}
-
-			if size == 0 {
-				_, err = reader.ReadString('\n')
-				if err != nil {
-					return nil, fmt.Errorf("error reading final CRLF: %w", err)
-				}
-				break
-			}
-
-			chunk := make([]byte, size)
-			_, err = reader.Read(chunk)
-			if err != nil {
-				return nil, fmt.Errorf("error reading chunk data: %w", err)
-			}
-
-			body.Write(chunk)
-
-			_, err = reader.ReadString('\n')
-			if err != nil {
-				return nil, fmt.Errorf("error reading chunk CRLF: %w", err)
-			}
-		}
-
-		resp.Body = body.String()
-	} else if contentLength, ok := resp.Headers["Content-Length"]; ok {
-		length, err := strconv.Atoi(contentLength)
-		if err != nil {
-			return nil, fmt.Errorf("invalid Content-Length: %w", err)
-		}
-
-		bodyBytes := make([]byte, length)
-		_, err = reader.Read(bodyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("error reading body: %w", err)
-		}
-
-		resp.Body = string(bodyBytes)
-	} else {
-		bodyBytes, err := reader.ReadBytes(0)
-		if err != nil && err.Error() != "EOF" {
-			return nil, fmt.Errorf("error reading body: %w", err)
-		}
-		resp.Body = string(bodyBytes)
+	bodyBytes, err := io.ReadAll(reader)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("error reading body: %w", err)
 	}
+	resp.Body = string(bodyBytes)
 
 	return resp, nil
 }
