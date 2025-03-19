@@ -1,9 +1,9 @@
-To build it use:
+## To build it use:
 ```
 go build -o go2web ./cmd/go2web
 ```
 
-Made as a script using this script:
+## Made as a script using this script:
 
 ```
 mkdir -p ~/bin
@@ -26,5 +26,8 @@ echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
 Test if works:
-![alt text](ss1.png)
+![Screenshot](static/ss1.png)
+
+## the gif
+![Gif](static/giv.gif)
 
