@@ -21,16 +21,14 @@ func StripHTMLTags(htmlContent string) (string, error) {
 	extractText(doc, &buf)
 
 	result := buf.String()
-	result = strings.Join(strings.Fields(result), " ")
+	result = strings.TrimSpace(result)
 	return result, nil
 }
 
 func extractText(n *html.Node, buf *bytes.Buffer) {
 	if n.Type == html.TextNode {
-		buf.WriteString(n.Data)
-		if len(n.Data) > 0 && !strings.HasSuffix(n.Data, " ") {
-			buf.WriteString(" ")
-		}
+		buf.WriteString(strings.TrimSpace(n.Data))
+		buf.WriteString(" ")
 	}
 
 	if n.Type == html.ElementNode && (n.Data == "script" || n.Data == "style") {
@@ -43,7 +41,11 @@ func extractText(n *html.Node, buf *bytes.Buffer) {
 
 	if n.Type == html.ElementNode {
 		switch n.Data {
-		case "div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "br", "li":
+		case "div", "p":
+			buf.WriteString("\n")
+		case "h1", "h2", "h3", "h4", "h5", "h6":
+			buf.WriteString("\n")
+		case "br", "li":
 			buf.WriteString("\n")
 		}
 	}

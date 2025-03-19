@@ -23,3 +23,7 @@ go.work.sum
 
 # env file
 .env
+.idea
+.vscode
+cmd/go2web/output.txt
+go2web
