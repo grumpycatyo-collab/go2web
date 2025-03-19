@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/grumpycatyo-collab/go2web/business/cli"
+	"github.com/grumpycatyo-collab/go2web/business/http"
 )
 
 func main() {
@@ -17,6 +18,18 @@ func main() {
 
 	if options.Help {
 		cli.PrintHelp()
+		os.Exit(0)
+	}
+
+	client := http.NewClient()
+	if options.URL != "" {
+		resp, err := client.Get(options.URL)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error fetching URL: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println(resp.Body)
 		os.Exit(0)
 	}
 }
