@@ -6,6 +6,7 @@ import (
 
 	"github.com/grumpycatyo-collab/go2web/business/cli"
 	"github.com/grumpycatyo-collab/go2web/business/http"
+	"github.com/grumpycatyo-collab/go2web/business/search"
 	"github.com/grumpycatyo-collab/go2web/business/utils"
 )
 
@@ -44,6 +45,22 @@ func main() {
 		fmt.Println("Content saved to (sorry, its too much to display in the terminal):", filePath)
 		os.Exit(0)
 	}
+
+	if options.SearchTerm != "" {
+		results, err := search.PerformSearch(client, options.SearchTerm)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error searching: %v\n", err)
+			os.Exit(1)
+		}
+
+		for i, result := range results {
+			fmt.Printf("%d. %s\n   URL: %s\n\n", i+1, result.Title, result.URL)
+		}
+		os.Exit(0)
+	}
+
+	cli.PrintHelp()
+	os.Exit(1)
 }
 
 func saveToFile(filename, content string) (string, error) {
