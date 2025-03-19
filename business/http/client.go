@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"encoding/json"
+
 	"github.com/grumpycatyo-collab/go2web/business/cache"
 	"github.com/grumpycatyo-collab/go2web/business/utils"
 )
@@ -36,9 +38,37 @@ func NewClient() *Client {
 	}
 }
 
+func (c *Client) cacheResponse(url string, resp *Response) {
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return
+	}
+
+	c.cache.Set(url, data)
+}
+
+func (c *Client) getCachedResponse(url string) *Response {
+	data := c.cache.Get(url)
+	if data == nil {
+		return nil
+	}
+
+	respBytes, ok := data.([]byte)
+	if !ok {
+		return nil
+	}
+
+	var cachedResp Response
+	err := json.Unmarshal(respBytes, &cachedResp)
+	if err != nil {
+		return nil
+	}
+
+	return &cachedResp
+}
 func (c *Client) Get(url string) (*Response, error) {
-	if cachedResp := c.cache.Get(url); cachedResp != nil {
-		return cachedResp.(*Response), nil
+	if cachedResp := c.getCachedResponse(url); cachedResp != nil {
+		return cachedResp, nil
 	}
 
 	parsedURL, err := utils.ParseURL(url)
@@ -123,7 +153,7 @@ func (c *Client) Get(url string) (*Response, error) {
 		return c.Get(location)
 	}
 
-	c.cache.Set(url, resp)
+	c.cacheResponse(url, resp)
 
 	return resp, nil
 }
