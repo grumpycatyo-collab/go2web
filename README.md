@@ -28,6 +28,9 @@ source ~/.bashrc
 Test if works:
 ![Screenshot](static/ss1.png)
 
+## Caching with hash key 
+![SS2](static/ss2.png)
+
 ## the gif
 ![Gif](static/giv.gif)
 
