@@ -41,8 +41,8 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error saving file: %v\n", err)
 			os.Exit(1)
 		}
-
-		fmt.Println("Content saved to (sorry, its too much to display in the terminal):", filePath)
+		fmt.Println(content)
+		fmt.Println("Content saved to:", filePath)
 		os.Exit(0)
 	}
 
